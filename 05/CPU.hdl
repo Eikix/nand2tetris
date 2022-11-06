@@ -40,4 +40,56 @@ CHIP CPU {
 
     PARTS:
     // Put your code here:
+
+    // Mux (instruction and ALU output) => A register => Mux(A, inMemory) = res => ALU (A, res) => outM
+    Not(in=instruction[0], out=notInstructionZero);
+    Mux16(a=instruction, b=ALUOut, sel=instruction[0], out=ARegister);
+    ARegister(in=ARegister, load=instruction[9], out=ARegisterOut, out=ARegisterPCOut);
+    Mux16(a=ARegisterOut, b=inM, sel=instruction[3], out=ALUY);
+    DRegister(in=ALUOut, load=instruction[10], out=DRegisterOut);
+
+    // Goto and conditional jumps
+    // ng and zr
+    Not(in=zr, out=ALUOutIsNN);
+    Not(in=ng, out=ALUOutIsGEZero);
+    And(a=ALUOutIsNN, b=ALUOutIsGEZero, out=ALUOutIsGTZero);
+    Or(a=ng, b=zr, out=ALUOutIsLEZero);
+    // JMP
+    And(a=instruction[13], b=instruction[14], out=j1AndJ2);
+    And(a=j1AndJ2, b=instruction[15], out=JMP);
+    // JLE
+    Not(in=instruction[15], out=notJ3);
+    And(a=j1AndJ2, b=notJ3, out=JLE);
+    And(a=JLE, b=ALUOutIsLEZero, out=loadJLE);
+    // JNE
+    Not(in=instruction[14], out=notJ2);
+    And(a=instruction[13], b=notJ2, out=j1AndNotJ2);
+    And(a=j1AndNotJ2, b=instruction[15], out=JNE);
+    And(a=JNE, b=ALUOutIsNN, out=loadJNE);
+    // JLT 
+    And(a=j1AndNotJ2, b=notJ3, out=JLT);
+    And(a=JLT, b=ng, out=loadJLT);
+    // JGE
+    Not(in=instruction[13], out=notJ1);
+    And(a=instruction[14], b=instruction[15], out=j2AndJ3);
+    And(a=notJ1, b=j2AndJ3, out=JGE);
+    And(a=JGE, b=ALUOutIsGEZero, out=loadJGE);
+    // JEQ
+    And(a=notJ1, b=instruction[14], out=notJ1AndJ2);
+    And(a=notJ1AndJ2, b=notJ3, out=JEQ);
+    And(a=JEQ, b=zr, out=loadJEQ);
+    // JGT
+    And(a=notJ1, b=notJ2, out=notJ1AndNotJ2);
+    And(a=notJ1AndNotJ2, b=instruction[15], out=JGT);
+    And(a=JGT, b=ALUOutIsGTZero, out=loadJGT);
+    // null
+    And(a=notJ1AndNotJ2, b=notJ3, out=increment);
+    Or8Way(in=[loadJEQ, loadJGE, loadJGT, loadJLE, loadJLT, loadJNE, JMP, false], out=loadControlBit);
+
+    
+
+
+    PC(in=ARegisterPCOut, load=loadControlBit, inc=increment, reset=reset, out=pc);
+    ALU(x=DRegisterOut, y=ALUY, zx=instruction[4], nx=instruction[5], zy=instruction[6], ny=instruction[7], f=instruction[8], no=instruction[9], out=ALUOut, out=outM,  zr=zr, ng=ng);
+
 }
